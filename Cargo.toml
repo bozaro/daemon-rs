@@ -1,0 +1,17 @@
+[package]
+name = "demon"
+license = "MIT"
+version = "0.0.1"
+authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
+
+[target.x86_64-pc-windows-gnu.dependencies.winapi]
+version = "*"
+
+[target.i686-pc-windows-gnu.dependencies.winapi]
+version = "*"
+
+[target.x86_64-pc-windows-gnu.dependencies.advapi32-sys]
+version = "*"
+
+[target.i686-pc-windows-gnu.dependencies.advapi32-sys]
+version = "*"
