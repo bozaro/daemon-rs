@@ -1,12 +1,9 @@
 use std::sync::mpsc::Receiver;
 
-pub enum Signal {
-	// Last state
+pub enum State {
 	Start,
-	// Need to reload settings
 	Reload,
-	// Last state
-	Shutdown,
+	Stop,
 }
 
 pub struct Demon {
@@ -15,5 +12,5 @@ pub struct Demon {
 }
 
 pub trait DemonRunner {
-	fn run<F: FnOnce(Receiver<Signal>)>(&self, f: F);
+	fn run<F: FnOnce(Receiver<State>)>(&self, f: F);
 }

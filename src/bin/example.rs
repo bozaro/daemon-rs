@@ -4,7 +4,7 @@
 #![feature(path)]
 
 extern crate demon;
-use demon::Signal;
+use demon::State;
 use demon::Demon;
 use demon::DemonRunner;
 use std::env;
@@ -18,13 +18,13 @@ fn main() {
 	let demon = Demon {
 		name: "Example".to_string()
 	};
-	demon.run(move |rx: Receiver<Signal>| {
+	demon.run(move |rx: Receiver<State>| {
 		log("Worker started.");
 		for signal in rx.iter() {
 			match signal {
-				Signal::Start => log("Worker: Start"),
-				Signal::Reload => log("Worker: Reload"),
-				Signal::Shutdown => log("Worker: Shutdown")
+				State::Start => log("Worker: Start"),
+				State::Reload => log("Worker: Reload"),
+				State::Stop => log("Worker: Stop")
 			};
 		}
 		log("Worker finished.");
@@ -39,11 +39,11 @@ fn log(message: &str) {
 }
 
 fn log_safe(message: &str) -> Result<(), Error> {
+	println! ("{}", message);
 	let path = try! (env::current_exe()).with_extension("log");
 	let mut file = try! (OpenOptions::new().append(true).open(&path));
 //	try! (file.seek(0, SeekStyle::SeekEnd));
 	try! (file.write(message.as_bytes()));
 	try! (file.write(b"\n"));
-	println! ("{}", message);
 	Ok(())
 }
