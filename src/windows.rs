@@ -4,6 +4,7 @@ extern crate "kernel32-sys" as kernel32;
 use super::demon::*;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
+use std::os::error_string;
 use self::winapi::*;
 use self::kernel32::*;
 
@@ -11,9 +12,9 @@ impl DemonRunner for Demon {
 	fn run<F: FnOnce(Receiver<Signal>)>(&self, f: F) {
 		unsafe
 		{
-			if (SetConsoleCtrlHandler(Some(console_handler), TRUE) == 0)
+			if SetConsoleCtrlHandler(Some(console_handler), TRUE) == 0
 			{
-				panic! ("SetConsoleCtrlHandler");
+				panic! ("SetConsoleCtrlHandler: {}", error_string(GetLastError() as i32));
 			}
 			println! ("{}", self.name);
 			let (tx, rx) = channel();

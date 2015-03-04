@@ -1,3 +1,5 @@
+#![feature(os)]
+
 pub mod demon;
 pub use demon::*;
 
