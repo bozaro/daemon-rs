@@ -17,21 +17,58 @@ static mut demon_static:*mut DemonStatic = 0 as *mut DemonStatic;
 
 struct DemonStatic
 {
-	tx: Option<Sender<State>>,
+	holder: Box<DemonFunc>,
 }
+
+trait DemonFunc
+{
+	fn exec(&mut self) -> Result<(), String>;
+	fn take_tx(&mut self) -> Option<Sender<State>>;
+}
+
+struct DemonFuncHolder <F: FnOnce(Receiver<State>)>
+{
+	tx: Option<Sender<State>>,
+	func: Option<(F, Receiver<State>)>,
+}
+
+
+impl <F: FnOnce(Receiver<State>)> DemonFunc for DemonFuncHolder<F>
+{
+	fn exec(&mut self) -> Result<(), String>
+	{
+		match self.func.take()
+		{
+			Some((func, rx)) => {
+				func(rx);
+				Ok(())
+			}
+			None => Err(format! ("INTERNAL ERROR: Can't unwrap demon function"))
+		}
+	}
+
+	fn take_tx(&mut self) -> Option<Sender<State>>
+	{
+		self.tx.take()
+	}
+}
+
 
 impl DemonRunner for Demon
 {
-	fn run<F: FnOnce(Receiver<State>)>(&self, func: F) -> Result<(), String> {
+	fn run<F: 'static + FnOnce(Receiver<State>)>(&self, func: F) -> Result<(), String> {
 		let (tx, rx) = channel();
 		tx.send(State::Start).unwrap();
 		let mut demon = DemonStatic
 		{
-			tx: Some(tx),
+			holder: Box::new(DemonFuncHolder
+			{
+				tx: Some(tx),
+				func: Some((func, rx)),
+			})
 		};
-		
 		try! (guard_compare_and_swap(demon_null(), &mut demon));
-		let result = demon_console(func, rx);
+		let result = demon_console(&mut demon);
 		try! (guard_compare_and_swap(&mut demon, demon_null()));
 		result
 	}
@@ -52,21 +89,22 @@ fn guard_compare_and_swap(old_value: *mut DemonStatic, new_value: *mut DemonStat
 	Ok(())
 }
 
-fn demon_console<F: FnOnce(Receiver<State>)>(func: F, rx: Receiver<State>) -> Result<(), String>
+fn demon_console(demon: &mut DemonStatic) -> Result<(), String>
 {
+	let result;
 	unsafe
 	{
 		if SetConsoleCtrlHandler(Some(console_handler), TRUE) == FALSE
 		{
 			return Err(format! ("Failed SetConsoleCtrlHandler: {}", error_string(GetLastError() as i32)));
 		}
-		func(rx);
+		result = demon.holder.exec();
 		if SetConsoleCtrlHandler(Some(console_handler), FALSE) == FALSE
 		{
 			return Err(format! ("Failed SetConsoleCtrlHandler: {}", error_string(GetLastError() as i32)));
 		}
 	}
-	Ok(())
+	result
 }
 
 unsafe extern "system" fn console_handler(_: DWORD) -> BOOL
@@ -74,12 +112,10 @@ unsafe extern "system" fn console_handler(_: DWORD) -> BOOL
 	let guard = LOCK.lock().unwrap();
 	if demon_static != demon_null()
 	{
-		return match (*demon_static).tx
+		return match (*demon_static).holder.take_tx()
 		{
 			Some(ref tx) => {
-				let result = tx.send(State::Stop);
-				(*demon_static).tx = None;
-				return match result
+				return match tx.send(State::Stop)
 				{
 					Ok(_) => TRUE,
 					Err(_) => FALSE,

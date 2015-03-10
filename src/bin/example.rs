@@ -28,7 +28,7 @@ fn main() {
 			};
 		}
 		log("Worker finished.");
-	});
+	}).unwrap();
 	log("Example finished.");
 }
 

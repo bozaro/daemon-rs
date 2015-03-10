@@ -12,5 +12,5 @@ pub struct Demon {
 }
 
 pub trait DemonRunner {
-	fn run<F: FnOnce(Receiver<State>)>(&self, f: F) -> Result<(), String>;
+	fn run<F: 'static + FnOnce(Receiver<State>)>(&self, f: F) -> Result<(), String>;
 }
