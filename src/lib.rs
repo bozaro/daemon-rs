@@ -1,3 +1,4 @@
+#![feature(collections)]
 #![feature(os)]
 #![feature(std_misc)]
 

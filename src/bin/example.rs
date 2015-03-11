@@ -16,7 +16,7 @@ use std::sync::mpsc::Receiver;
 fn main() {
 	log("Example started.");
 	let demon = Demon {
-		name: "Example".to_string()
+		name: "example".to_string()
 	};
 	demon.run(move |rx: Receiver<State>| {
 		log("Worker started.");
@@ -39,10 +39,9 @@ fn log(message: &str) {
 }
 
 fn log_safe(message: &str) -> Result<(), Error> {
-	println! ("{}", message);
+//	println! ("{}", message);
 	let path = try! (env::current_exe()).with_extension("log");
-	let mut file = try! (OpenOptions::new().append(true).open(&path));
-//	try! (file.seek(0, SeekStyle::SeekEnd));
+	let mut file = try! (OpenOptions::new().create(true).append(true).open(&path));
 	try! (file.write(message.as_bytes()));
 	try! (file.write(b"\n"));
 	Ok(())
