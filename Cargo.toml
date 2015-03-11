@@ -2,6 +2,7 @@
 name = "demon"
 license = "MIT"
 version = "0.0.1"
+description = "Library for simple creating Linux demons and Windows services."
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [target.x86_64-pc-windows-gnu.dependencies.winapi]
