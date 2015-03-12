@@ -1,12 +1,12 @@
-#![feature(fs)]
 #![feature(io)]
-#![feature(env)]
 #![feature(path)]
 
-extern crate demon;
-use demon::State;
-use demon::Demon;
-use demon::DemonRunner;
+extern crate daemon;
+extern crate time;
+
+use daemon::State;
+use daemon::Demon;
+use daemon::DemonRunner;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::Error;
@@ -39,10 +39,11 @@ fn log(message: &str) {
 }
 
 fn log_safe(message: &str) -> Result<(), Error> {
-//	println! ("{}", message);
+	let line = format! ("{}: {}", time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap(), message);
+	println! ("{}", line);
 	let path = try! (env::current_exe()).with_extension("log");
-	let mut file = try! (OpenOptions::new().create(true).append(true).open(&path));
-	try! (file.write(message.as_bytes()));
+	let mut file = try! (OpenOptions::new().create(true).write(true).append(true).open(&path));
+	try! (file.write(line.as_bytes()));
 	try! (file.write(b"\n"));
 	Ok(())
 }

@@ -1,6 +1,6 @@
 extern crate libc;
 
-use super::demon::*;
+use super::daemon::*;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;

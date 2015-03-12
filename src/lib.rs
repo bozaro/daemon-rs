@@ -2,8 +2,8 @@
 #![feature(os)]
 #![feature(std_misc)]
 
-pub mod demon;
-pub use demon::*;
+pub mod daemon;
+pub use daemon::*;
 
 #[cfg(target_os = "windows")]
 pub mod windows;
