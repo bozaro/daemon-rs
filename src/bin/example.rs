@@ -2,7 +2,6 @@
 #![feature(path)]
 
 extern crate daemon;
-extern crate time;
 
 use daemon::State;
 use daemon::Daemon;
@@ -39,11 +38,10 @@ fn log(message: &str) {
 }
 
 fn log_safe(message: &str) -> Result<(), Error> {
-	let line = format! ("{}: {}", time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap(), message);
-	println! ("{}", line);
+	println! ("{}", message);
 	let path = try! (env::current_exe()).with_extension("log");
 	let mut file = try! (OpenOptions::new().create(true).write(true).append(true).open(&path));
-	try! (file.write(line.as_bytes()));
+	try! (file.write(message.as_bytes()));
 	try! (file.write(b"\n"));
 	Ok(())
 }
