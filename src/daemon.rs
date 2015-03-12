@@ -6,11 +6,11 @@ pub enum State {
 	Stop,
 }
 
-pub struct Demon {
-	// Demon name
+pub struct Daemon {
+	// Daemon name
 	pub name: String,
 }
 
-pub trait DemonRunner {
+pub trait DaemonRunner {
 	fn run<F: 'static + FnOnce(Receiver<State>)>(&self, f: F) -> Result<(), String>;
 }

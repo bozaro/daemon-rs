@@ -11,28 +11,28 @@ use std::ptr;
 
 static LOCK: StaticMutex = MUTEX_INIT;
 
-static mut demon_static:*mut DemonStatic = 0 as *mut DemonStatic;
+static mut daemon_static:*mut DaemonStatic = 0 as *mut DaemonStatic;
 
-struct DemonStatic
+struct DaemonStatic
 {
-	holder: Box<DemonFunc>,
+	holder: Box<DaemonFunc>,
 }
 
-trait DemonFunc
+trait DaemonFunc
 {
 	fn exec(&mut self) -> Result<(), String>;
 	fn send(&mut self, state: State) -> Result<(), String>;
 	fn take_tx(&mut self) -> Option<Sender<State>>;
 }
 
-struct DemonFuncHolder <F: FnOnce(Receiver<State>)>
+struct DaemonFuncHolder <F: FnOnce(Receiver<State>)>
 {
 	tx: Option<Sender<State>>,
 	func: Option<(F, Receiver<State>)>,
 }
 
 
-impl <F: FnOnce(Receiver<State>)> DemonFunc for DemonFuncHolder<F>
+impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 {
 	fn exec(&mut self) -> Result<(), String>
 	{
@@ -42,7 +42,7 @@ impl <F: FnOnce(Receiver<State>)> DemonFunc for DemonFuncHolder<F>
 				func(rx);
 				Ok(())
 			}
-			None => Err(format! ("INTERNAL ERROR: Can't unwrap demon function"))
+			None => Err(format! ("INTERNAL ERROR: Can't unwrap daemon function"))
 		}
 	}
 
@@ -66,42 +66,42 @@ impl <F: FnOnce(Receiver<State>)> DemonFunc for DemonFuncHolder<F>
 }
 
 
-impl DemonRunner for Demon
+impl DaemonRunner for Daemon
 {
 	fn run<F: 'static + FnOnce(Receiver<State>)>(&self, func: F) -> Result<(), String> {
 		let (tx, rx) = channel();
 		tx.send(State::Start).unwrap();
-		let mut demon = DemonStatic
+		let mut daemon = DaemonStatic
 		{
-			holder: Box::new(DemonFuncHolder
+			holder: Box::new(DaemonFuncHolder
 			{
 				tx: Some(tx),
 				func: Some((func, rx)),
 			}),
 		};
-		try! (guard_compare_and_swap(demon_null(), &mut demon));
-		let result = demon_console(&mut demon);
-		try! (guard_compare_and_swap(&mut demon, demon_null()));
+		try! (guard_compare_and_swap(daemon_null(), &mut daemon));
+		let result = daemon_console(&mut daemon);
+		try! (guard_compare_and_swap(&mut daemon, daemon_null()));
 		result
 	}
 }
 
-fn guard_compare_and_swap(old_value: *mut DemonStatic, new_value: *mut DemonStatic) -> Result<(), String>
+fn guard_compare_and_swap(old_value: *mut DaemonStatic, new_value: *mut DaemonStatic) -> Result<(), String>
 {
 	unsafe
 	{
 		let guard = LOCK.lock().unwrap();
-		if demon_static != old_value
+		if daemon_static != old_value
 		{
 			return Err("This function is not reentrant.".to_string());
 		}
-		demon_static = new_value;
+		daemon_static = new_value;
 		let _ = guard;
 	}
 	Ok(())
 }
 
-fn demon_console(demon: &mut DemonStatic) -> Result<(), String>
+fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), String>
 {
 	let result;
 	unsafe
@@ -110,7 +110,7 @@ fn demon_console(demon: &mut DemonStatic) -> Result<(), String>
 		//{
 		//	return Err(format! ("Failed SetConsoleCtrlHandler: {}", error_string(GetLastError() as i32)));
 		//}
-		result = demon.holder.exec();
+		result = daemon.holder.exec();
 		//if SetConsoleCtrlHandler(Some(console_handler), FALSE) == FALSE
 		//{
 		//	return Err(format! ("Failed SetConsoleCtrlHandler: {}", error_string(GetLastError() as i32)));
@@ -122,10 +122,10 @@ fn demon_console(demon: &mut DemonStatic) -> Result<(), String>
 unsafe extern "system" fn signal_handler(sig: libc::c_int)
 {
 	let guard = LOCK.lock().unwrap();
-	if demon_static != demon_null()
+	if daemon_static != daemon_null()
 	{
-		let demon = &mut *demon_static;
-		return match demon.holder.take_tx()
+		let daemon = &mut *daemon_static;
+		return match daemon.holder.take_tx()
 		{
 			Some(ref tx) => {
 				let _ = tx.send(State::Stop);
@@ -136,8 +136,8 @@ unsafe extern "system" fn signal_handler(sig: libc::c_int)
 	let _ = guard;
 }
 
-fn demon_null() -> *mut DemonStatic {
-	0 as *mut DemonStatic
+fn daemon_null() -> *mut DaemonStatic {
+	0 as *mut DaemonStatic
 }
 
 extern "C" {

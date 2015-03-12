@@ -5,8 +5,8 @@ extern crate daemon;
 extern crate time;
 
 use daemon::State;
-use daemon::Demon;
-use daemon::DemonRunner;
+use daemon::Daemon;
+use daemon::DaemonRunner;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::Error;
@@ -15,10 +15,10 @@ use std::sync::mpsc::Receiver;
 
 fn main() {
 	log("Example started.");
-	let demon = Demon {
+	let daemon = Daemon {
 		name: "example".to_string()
 	};
-	demon.run(move |rx: Receiver<State>| {
+	daemon.run(move |rx: Receiver<State>| {
 		log("Worker started.");
 		for signal in rx.iter() {
 			match signal {
