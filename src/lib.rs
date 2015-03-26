@@ -1,5 +1,6 @@
 #![feature(collections)]
 #![feature(os)]
+#![feature(libc)]
 #![feature(std_misc)]
 
 pub mod daemon;
