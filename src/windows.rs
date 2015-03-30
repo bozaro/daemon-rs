@@ -1,6 +1,6 @@
 extern crate winapi;
-extern crate advapi32_sys as advapi32;
-extern crate kernel32_sys as kernel32;
+extern crate advapi32;
+extern crate kernel32;
 
 use super::daemon::*;
 use std::sync::mpsc::channel;
