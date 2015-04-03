@@ -3,12 +3,12 @@ extern crate advapi32;
 extern crate kernel32;
 
 use super::daemon::*;
+use std::io::{Error, ErrorKind};
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::sync::StaticMutex;
 use std::sync::MUTEX_INIT;
-use std::os::error_string;
 use std::ptr;
 use self::winapi::*;
 use self::advapi32::*;
@@ -27,8 +27,8 @@ struct DaemonStatic
 
 trait DaemonFunc
 {
-	fn exec(&mut self) -> Result<(), String>;
-	fn send(&mut self, state: State) -> Result<(), String>;
+	fn exec(&mut self) -> Result<(), Error>;
+	fn send(&mut self, state: State) -> Result<(), Error>;
 	fn take_tx(&mut self) -> Option<Sender<State>>;
 }
 
@@ -41,7 +41,7 @@ struct DaemonFuncHolder <F: FnOnce(Receiver<State>)>
 
 impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 {
-	fn exec(&mut self) -> Result<(), String>
+	fn exec(&mut self) -> Result<(), Error>
 	{
 		match self.func.take()
 		{
@@ -49,20 +49,19 @@ impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 				func(rx);
 				Ok(())
 			}
-			None => Err(format! ("INTERNAL ERROR: Can't unwrap daemon function"))
+			None => Err(Error::new(ErrorKind::Other, "INTERNAL ERROR: Can't unwrap daemon function"))
 		}
 	}
 
-	fn send(&mut self, state: State) -> Result<(), String>
+	fn send(&mut self, state: State) -> Result<(), Error>
 	{
 		match self.tx
 		{
-			Some(ref tx) => match tx.send(state)
-			{
-				Err(e) => Err(format! ("Send new state error: {:?}", e)),
-				Ok(_) => Ok(()),
+			Some(ref tx) => match tx.send(state) {
+				Ok(()) => Ok(()),
+				Err(e) => Err(Error::new(ErrorKind::Other, e)),
 			},
-			None => Err(format! ("Service is already exited")),
+			None => Err(Error::new(ErrorKind::Other, "Service is already exited")),
 		}
 	}
 	
@@ -75,7 +74,7 @@ impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 
 impl DaemonRunner for Daemon
 {
-	fn run<F: 'static + FnOnce(Receiver<State>)>(&self, func: F) -> Result<(), String> {
+	fn run<F: 'static + FnOnce(Receiver<State>)>(&self, func: F) -> Result<(), Error> {
 		let (tx, rx) = channel();
 		tx.send(State::Start).unwrap();
 		let mut daemon = DaemonStatic
@@ -95,14 +94,14 @@ impl DaemonRunner for Daemon
 	}
 }
 
-fn guard_compare_and_swap(old_value: *mut DaemonStatic, new_value: *mut DaemonStatic) -> Result<(), String>
+fn guard_compare_and_swap(old_value: *mut DaemonStatic, new_value: *mut DaemonStatic) -> Result<(), Error>
 {
 	unsafe
 	{
 		let guard = LOCK.lock().unwrap();
 		if daemon_static != old_value
 		{
-			return Err("This function is not reentrant.".to_string());
+			return Err(Error::new(ErrorKind::Other, "This function is not reentrant."));
 		}
 		daemon_static = new_value;
 		let _ = guard;
@@ -110,7 +109,7 @@ fn guard_compare_and_swap(old_value: *mut DaemonStatic, new_value: *mut DaemonSt
 	Ok(())
 }
 
-fn daemon_service(daemon: &mut DaemonStatic) -> Result<(), String>
+fn daemon_service(daemon: &mut DaemonStatic) -> Result<(), Error>
 {
 	unsafe
 	{
@@ -130,19 +129,19 @@ fn daemon_service(daemon: &mut DaemonStatic) -> Result<(), String>
 	}
 }
 
-fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), String>
+fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), Error>
 {
 	let result;
 	unsafe
 	{
 		if SetConsoleCtrlHandler(Some(console_handler), TRUE) == FALSE
 		{
-			return Err(format! ("Failed SetConsoleCtrlHandler: {}", error_string(GetLastError() as i32)));
+			return Err(Error::last_os_error());
 		}
 		result = daemon.holder.exec();
 		if SetConsoleCtrlHandler(Some(console_handler), FALSE) == FALSE
 		{
-			return Err(format! ("Failed SetConsoleCtrlHandler: {}", error_string(GetLastError() as i32)));
+			return Err(Error::last_os_error());
 		}
 	}
 	result

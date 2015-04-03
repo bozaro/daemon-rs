@@ -1,6 +1,7 @@
 extern crate libc;
 
 use super::daemon::*;
+use std::io::{Error, ErrorKind};
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
@@ -18,8 +19,8 @@ struct DaemonStatic
 
 trait DaemonFunc
 {
-	fn exec(&mut self) -> Result<(), String>;
-	fn send(&mut self, state: State) -> Result<(), String>;
+	fn exec(&mut self) -> Result<(), Error>;
+	fn send(&mut self, state: State) -> Result<(), Error>;
 	fn take_tx(&mut self) -> Option<Sender<State>>;
 }
 
@@ -32,7 +33,7 @@ struct DaemonFuncHolder <F: FnOnce(Receiver<State>)>
 
 impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 {
-	fn exec(&mut self) -> Result<(), String>
+	fn exec(&mut self) -> Result<(), Error>
 	{
 		match self.func.take()
 		{
@@ -40,11 +41,11 @@ impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 				func(rx);
 				Ok(())
 			}
-			None => Err(format! ("INTERNAL ERROR: Can't unwrap daemon function"))
+			None => Err(Error::new(ErrorKind::Other, "INTERNAL ERROR: Can't unwrap daemon function"))
 		}
 	}
 
-	fn send(&mut self, state: State) -> Result<(), String>
+	fn send(&mut self, state: State) -> Result<(), Error>
 	{
 		match self.tx
 		{
@@ -66,7 +67,7 @@ impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 
 impl DaemonRunner for Daemon
 {
-	fn run<F: 'static + FnOnce(Receiver<State>)>(&self, func: F) -> Result<(), String> {
+	fn run<F: 'static + FnOnce(Receiver<State>)>(&self, func: F) -> Result<(), Error> {
 		let (tx, rx) = channel();
 		tx.send(State::Start).unwrap();
 		let mut daemon = DaemonStatic
@@ -84,7 +85,7 @@ impl DaemonRunner for Daemon
 	}
 }
 
-fn guard_compare_and_swap(old_value: *mut DaemonStatic, new_value: *mut DaemonStatic) -> Result<(), String>
+fn guard_compare_and_swap(old_value: *mut DaemonStatic, new_value: *mut DaemonStatic) -> Result<(), Error>
 {
 	unsafe
 	{
@@ -99,7 +100,7 @@ fn guard_compare_and_swap(old_value: *mut DaemonStatic, new_value: *mut DaemonSt
 	Ok(())
 }
 
-fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), String>
+fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), Error>
 {
 	let result;
 	unsafe

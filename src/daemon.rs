@@ -1,4 +1,5 @@
 use std::sync::mpsc::Receiver;
+use std::io::Error;
 
 pub enum State {
 	Start,
@@ -12,5 +13,5 @@ pub struct Daemon {
 }
 
 pub trait DaemonRunner {
-	fn run<F: 'static + FnOnce(Receiver<State>)>(&self, f: F) -> Result<(), String>;
+	fn run<F: 'static + FnOnce(Receiver<State>)>(&self, f: F) -> Result<(), Error>;
 }
