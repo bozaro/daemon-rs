@@ -6,8 +6,6 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::sync::StaticMutex;
 use std::sync::MUTEX_INIT;
-use std::os::error_string;
-use std::ptr;
 
 static LOCK: StaticMutex = MUTEX_INIT;
 
