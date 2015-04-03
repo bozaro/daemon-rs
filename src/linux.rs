@@ -51,10 +51,10 @@ impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 		{
 			Some(ref tx) => match tx.send(state)
 			{
-				Err(e) => Err(format! ("Send new state error: {:?}", e)),
 				Ok(_) => Ok(()),
+				Err(e) => Err(Error::new(ErrorKind::Other, e)),
 			},
-			None => Err(format! ("Service is already exited")),
+			None => Err(Error::new(ErrorKind::Other, "Service is already exited")),
 		}
 	}
 	
@@ -92,7 +92,7 @@ fn guard_compare_and_swap(old_value: *mut DaemonStatic, new_value: *mut DaemonSt
 		let guard = LOCK.lock().unwrap();
 		if daemon_static != old_value
 		{
-			return Err("This function is not reentrant.".to_string());
+			return Err(Error::new(ErrorKind::Other, "This function is not reentrant."));
 		}
 		daemon_static = new_value;
 		let _ = guard;
