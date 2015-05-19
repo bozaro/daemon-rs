@@ -7,16 +7,16 @@ use std::io::{Error, ErrorKind};
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
-use std::sync::StaticMutex;
-use std::sync::MUTEX_INIT;
 use std::ptr;
 use self::winapi::*;
 use self::advapi32::*;
 use self::kernel32::*;
 
-static LOCK: StaticMutex = MUTEX_INIT;
+declare_singleton! (singleton, DaemonHolder, DaemonHolder {holder: 0 as *mut DaemonStatic});
 
-static mut daemon_static:*mut DaemonStatic = 0 as *mut DaemonStatic;
+struct DaemonHolder {
+	holder: *mut DaemonStatic,
+}
 
 struct DaemonStatic
 {
@@ -71,6 +71,18 @@ impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 	}
 }
 
+fn daemon_wrapper<R, F: FnOnce(&mut DaemonHolder) -> R>(func: F) -> R {
+	let singleton = singleton();
+	let result = match singleton.lock() {
+		Ok(ref mut daemon) => {
+			func(daemon)
+		}
+		Err(e) => {
+			panic!("Mutex error: {:?}", e);
+		}
+	};
+	result
+}
 
 impl DaemonRunner for Daemon
 {
@@ -96,17 +108,14 @@ impl DaemonRunner for Daemon
 
 fn guard_compare_and_swap(old_value: *mut DaemonStatic, new_value: *mut DaemonStatic) -> Result<(), Error>
 {
-	unsafe
-	{
-		let guard = LOCK.lock().unwrap();
-		if daemon_static != old_value
+	daemon_wrapper(|daemon_static: &mut DaemonHolder| -> Result<(), Error> {
+		if daemon_static.holder != old_value
 		{
 			return Err(Error::new(ErrorKind::Other, "This function is not reentrant."));
 		}
-		daemon_static = new_value;
-		let _ = guard;
-	}
-	Ok(())
+		daemon_static.holder = new_value;
+		Ok(())
+	})
 }
 
 fn daemon_service(daemon: &mut DaemonStatic) -> Result<(), Error>
@@ -148,7 +157,7 @@ fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), Error>
 }
 
 fn service_name(name: &str) -> Vec<u16> {
-	let mut result: Vec<u16> = name.utf16_units().collect();
+	let mut result: Vec<u16> = name.chars().map(|c| c as u16).collect();
 	result.push(0);
 	result
 }
@@ -169,19 +178,19 @@ unsafe extern "system" fn service_main(
 	_: DWORD, // dw_num_services_args
 	_: *mut LPWSTR, // lp_service_arg_vectors
 ) {
-	let guard = LOCK.lock().unwrap();
-	if daemon_static != daemon_null()
-	{
-		let daemon = &mut *daemon_static;
-		let service_name = service_name(&daemon.name);
-		daemon.handle = RegisterServiceCtrlHandlerExW(service_name.as_ptr(), Some(service_handler), ptr::null_mut());
-		SetServiceStatus (daemon.handle, &mut create_service_status(SERVICE_START_PENDING));
-		SetServiceStatus (daemon.handle, &mut create_service_status(SERVICE_RUNNING));
+	daemon_wrapper(|daemon_static: &mut DaemonHolder| {
+		if daemon_static.holder != daemon_null()
+		{
+			let daemon = &mut *daemon_static.holder;
+			let service_name = service_name(&daemon.name);
+			daemon.handle = RegisterServiceCtrlHandlerExW(service_name.as_ptr(), Some(service_handler), ptr::null_mut());
+			SetServiceStatus (daemon.handle, &mut create_service_status(SERVICE_START_PENDING));
+			SetServiceStatus (daemon.handle, &mut create_service_status(SERVICE_RUNNING));
 
-		daemon.holder.exec().unwrap();
-		SetServiceStatus (daemon.handle, &mut create_service_status(SERVICE_STOPPED));
-	}
-	let _ = guard;
+			daemon.holder.exec().unwrap();
+			SetServiceStatus (daemon.handle, &mut create_service_status(SERVICE_STOPPED));
+		}
+	});
 }
 
 unsafe extern "system" fn service_handler(
@@ -190,43 +199,44 @@ unsafe extern "system" fn service_handler(
 	_: LPVOID, // lp_event_data
 	_: LPVOID  // lp_context
 ) -> DWORD {
-	let daemon = &mut *daemon_static;
-	match dw_control {
-		SERVICE_CONTROL_STOP | SERVICE_CONTROL_SHUTDOWN => {
-			match daemon.holder.take_tx()
-			{
-				Some(ref tx) => {
-					SetServiceStatus (daemon.handle, &mut create_service_status(SERVICE_STOP_PENDING));
-					let _ = tx.send(State::Stop);
+	daemon_wrapper(|daemon_static: &mut DaemonHolder| {
+		let daemon = &mut *daemon_static.holder;
+		match dw_control {
+			SERVICE_CONTROL_STOP | SERVICE_CONTROL_SHUTDOWN => {
+				match daemon.holder.take_tx()
+				{
+					Some(ref tx) => {
+						SetServiceStatus (daemon.handle, &mut create_service_status(SERVICE_STOP_PENDING));
+						let _ = tx.send(State::Stop);
+					}
+					None => {}
 				}
-				None => {}
 			}
-		}
-		_ => {}
-	};
+			_ => {}
+		};
+	});
 	0
 }
 
 unsafe extern "system" fn console_handler(_: DWORD) -> BOOL
 {
-	let guard = LOCK.lock().unwrap();
-	if daemon_static != daemon_null()
-	{
-		let daemon = &mut *daemon_static;
-		return match daemon.holder.take_tx()
-		{
-			Some(ref tx) => {
-				return match tx.send(State::Stop)
-				{
-					Ok(_) => TRUE,
-					Err(_) => FALSE,
+	daemon_wrapper(|daemon_static: &mut DaemonHolder| -> BOOL {
+		if daemon_static.holder != daemon_null() {
+			let daemon = &mut *daemon_static.holder;
+			match daemon.holder.take_tx() {
+				Some(ref tx) => {
+					match tx.send(State::Stop)
+					{
+						Ok(_) => TRUE,
+						Err(_) => FALSE,
+					}
 				}
+				None => TRUE
 			}
-			None => TRUE
+		} else {
+			FALSE
 		}
-	}
-	let _ = guard;
-	FALSE
+	})
 }
 
 fn daemon_null() -> *mut DaemonStatic {

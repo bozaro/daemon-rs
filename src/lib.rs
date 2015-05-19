@@ -1,9 +1,7 @@
-#![feature(collections)]
-#![feature(os)]
-#![feature(std_misc)]
-
 pub mod daemon;
 pub use daemon::*;
+
+mod singleton;
 
 #[cfg(target_os = "windows")]
 pub mod windows;
