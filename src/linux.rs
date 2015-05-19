@@ -5,12 +5,12 @@ use std::io::{Error, ErrorKind};
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
-use std::sync::StaticMutex;
-use std::sync::MUTEX_INIT;
 
-static LOCK: StaticMutex = MUTEX_INIT;
+declare_singleton! (singleton, DaemonHolder, DaemonHolder {holder: 0 as *mut DaemonStatic});
 
-static mut daemon_static:*mut DaemonStatic = 0 as *mut DaemonStatic;
+struct DaemonHolder {
+	holder: *mut DaemonStatic,
+}
 
 struct DaemonStatic
 {
@@ -29,7 +29,6 @@ struct DaemonFuncHolder <F: FnOnce(Receiver<State>)>
 	tx: Option<Sender<State>>,
 	func: Option<(F, Receiver<State>)>,
 }
-
 
 impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 {
@@ -64,6 +63,18 @@ impl <F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F>
 	}
 }
 
+fn daemon_wrapper<R, F: FnOnce(&mut DaemonHolder) -> R>(func: F) -> R {
+	let singleton = singleton();
+	let result = match singleton.lock() {
+		Ok(ref mut daemon) => {
+			func(daemon)
+		}
+		Err(e) => {
+			panic!("Mutex error: {:?}", e);
+		}
+	};
+	result
+}
 
 impl DaemonRunner for Daemon
 {
@@ -87,17 +98,14 @@ impl DaemonRunner for Daemon
 
 fn guard_compare_and_swap(old_value: *mut DaemonStatic, new_value: *mut DaemonStatic) -> Result<(), Error>
 {
-	unsafe
-	{
-		let guard = LOCK.lock().unwrap();
-		if daemon_static != old_value
+	daemon_wrapper(|daemon_static: &mut DaemonHolder| -> Result<(), Error> {
+		if daemon_static.holder != old_value
 		{
 			return Err(Error::new(ErrorKind::Other, "This function is not reentrant."));
 		}
-		daemon_static = new_value;
-		let _ = guard;
-	}
-	Ok(())
+		daemon_static.holder = new_value;
+		Ok(())
+	})
 }
 
 fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), Error>
@@ -120,10 +128,8 @@ fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), Error>
 
 unsafe extern "system" fn signal_handler(sig: libc::c_int)
 {
-	let guard = LOCK.lock().unwrap();
-	if daemon_static != daemon_null()
-	{
-		let daemon = &mut *daemon_static;
+	daemon_wrapper(|daemon_static: &mut DaemonHolder| {
+		let daemon = &mut *daemon_static.holder;
 		return match daemon.holder.take_tx()
 		{
 			Some(ref tx) => {
@@ -131,8 +137,7 @@ unsafe extern "system" fn signal_handler(sig: libc::c_int)
 			}
 			None => ()
 		}
-	}
-	let _ = guard;
+	});
 }
 
 fn daemon_null() -> *mut DaemonStatic {
