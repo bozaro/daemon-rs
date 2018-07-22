@@ -1,16 +1,15 @@
-extern crate advapi32;
-extern crate kernel32;
-extern crate winapi;
-
-use self::advapi32::*;
-use self::kernel32::*;
-use self::winapi::*;
 use super::daemon::*;
+
 use std::io::{Error, ErrorKind};
 use std::ptr;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
+
+use kernel32::*;
+use winapi::shared::minwindef::{BOOL, DWORD, FALSE, LPVOID, TRUE};
+use winapi::um::winnt::{SERVICE_WIN32_OWN_PROCESS, LPWSTR};
+use winapi::um::winsvc::*;
 
 declare_singleton!(
     singleton,

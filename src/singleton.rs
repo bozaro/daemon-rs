@@ -46,18 +46,8 @@ macro_rules! declare_singleton {
                     // Put it in the heap so it can outlive this call
                     SINGLETON = ::std::mem::transmute(Box::new(singleton));
 
-                    // Make sure to free heap memory at exit
-        					/* This doesn't exist in stable 1.0, so we will just leak it!
-        					rt::at_exit(|| {
-        						let singleton: Box<SingletonHolder> = mem::transmute(SINGLETON);
-
-        						// Let's explictly free the memory for this example
-        						drop(singleton);
-
-        						// Set it to null again. I hope only one thread can call `at_exit`!
-        						SINGLETON = 0 as *const _;
-        					});
-        					*/        });
+                    // TODO: Make sure to free heap memory at exit
+                });
                 (*SINGLETON).clone()
             }
         }
