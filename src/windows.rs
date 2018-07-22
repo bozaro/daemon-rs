@@ -92,9 +92,9 @@ impl DaemonRunner for Daemon {
             }),
             handle: 0 as SERVICE_STATUS_HANDLE,
         };
-        try!(guard_compare_and_swap(daemon_null(), &mut daemon));
+        guard_compare_and_swap(daemon_null(), &mut daemon)?;
         let result = daemon_service(&mut daemon);
-        try!(guard_compare_and_swap(&mut daemon, daemon_null()));
+        guard_compare_and_swap(&mut daemon, daemon_null())?;
         result
     }
 }
@@ -168,7 +168,7 @@ unsafe extern "system" fn service_main(
     _: DWORD,       // dw_num_services_args
     _: *mut LPWSTR, // lp_service_arg_vectors
 ) {
-    daemon_wrapper(|daemon_static: &mut DaemonHolder| {
+    let daemon_holder = daemon_wrapper(|daemon_static: &mut DaemonHolder| {
         if daemon_static.holder != daemon_null() {
             let daemon = &mut *daemon_static.holder;
             let service_name = service_name(&daemon.name);
@@ -183,7 +183,17 @@ unsafe extern "system" fn service_main(
             );
             SetServiceStatus(daemon.handle, &mut create_service_status(SERVICE_RUNNING));
 
-            daemon.holder.exec().unwrap();
+            Some(daemon)
+        } else {
+            None
+        }
+    });
+    if let Some(daemon) = daemon_holder {
+        daemon.holder.exec().unwrap();
+    }
+    daemon_wrapper(|daemon_static: &mut DaemonHolder| {
+        if daemon_static.holder != daemon_null() {
+            let daemon = &mut *daemon_static.holder;
             SetServiceStatus(daemon.handle, &mut create_service_status(SERVICE_STOPPED));
         }
     });
