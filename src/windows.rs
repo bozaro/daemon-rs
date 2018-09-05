@@ -6,8 +6,8 @@ use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 
-use kernel32::*;
 use winapi::shared::minwindef::{BOOL, DWORD, FALSE, LPVOID, TRUE};
+use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::winnt::{SERVICE_WIN32_OWN_PROCESS, LPWSTR};
 use winapi::um::winsvc::*;
 
@@ -132,16 +132,14 @@ fn daemon_service(daemon: &mut DaemonStatic) -> Result<(), Error> {
     }
 }
 
-fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), Error> {
+unsafe fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), Error> {
     let result;
-    unsafe {
-        if SetConsoleCtrlHandler(Some(console_handler), TRUE) == FALSE {
-            return Err(Error::last_os_error());
-        }
-        result = daemon.holder.exec();
-        if SetConsoleCtrlHandler(Some(console_handler), FALSE) == FALSE {
-            return Err(Error::last_os_error());
-        }
+    if SetConsoleCtrlHandler(Some(console_handler), TRUE) == FALSE {
+        return Err(Error::last_os_error());
+    }
+    result = daemon.holder.exec();
+    if SetConsoleCtrlHandler(Some(console_handler), FALSE) == FALSE {
+        return Err(Error::last_os_error());
     }
     result
 }
