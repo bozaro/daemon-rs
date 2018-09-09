@@ -10,22 +10,6 @@ documentation = "https://bozaro.github.io/daemon-rs/daemon/"
 [dependencies]
 libc = "*"
 
-[target.x86_64-pc-windows-gnu.dependencies]
-advapi32-sys = "0.1"
-kernel32-sys = "0.1"
-winapi = "0.2"
-
-[target.i686-pc-windows-gnu.dependencies]
-advapi32-sys = "0.1"
-kernel32-sys = "0.1"
-winapi = "0.2"
-
-[target.x86_64-pc-windows-msvc.dependencies]
-advapi32-sys = "0.1"
-kernel32-sys = "0.1"
-winapi = "0.2"
-
-[target.i686-pc-windows-msvc.dependencies]
-advapi32-sys = "0.1"
-kernel32-sys = "0.1"
-winapi = "0.2"
+[target.'cfg(windows)'.dependencies]
+kernel32-sys = "0.2"
+winapi = { version = "0.3", features = [ "winsvc" ] }
