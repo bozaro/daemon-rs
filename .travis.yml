@@ -1,20 +1,13 @@
 language: rust
 sudo: required
 dist: trusty
-services: docker
 cache: cargo
 
 env:
   global:
     secure: Ndg2NLgx6LjKSVifYwoPOeWGkoa4+cnD0UQfCL3+IV5dLgehrQ00sdME8y1fP5E30UqPXDMNwIq65ds6l9q8LMp7/DvSNZ+UJNZBTvT8/TR91aAk+NKVrJ35t9mOVyf0OugSW1eigTq3NGx2w/PuQzJRwV30WPWOKQgMjXtC1xk=
-  matrix:
-    - TARGET=x86_64-unknown-linux-gnu
-    - TARGET=i686-unknown-linux-gnu
-    - TARGET=x86_64-pc-windows-gnu
-    - TARGET=i686-pc-windows-gnu
 
-install:
-  - cargo install -f cross
+install: cargo install -f cross
 
 script:
   - cross build --target $TARGET --verbose
@@ -22,6 +15,25 @@ script:
 
 jobs:
   include:
+    - stage: test
+      env: TARGET=x86_64-unknown-linux-gnu
+      services: docker
+    - stage: test
+      env: TARGET=i686-unknown-linux-gnu
+      services: docker
+    - stage: test
+      env: TARGET=x86_64-pc-windows-gnu
+      services: docker
+    - stage: test
+      env: TARGET=i686-pc-windows-gnu
+      services: docker
+    - stage: test
+      env: TARGET=x86_64-apple-darwin
+      os: osx
+    - stage: test
+      env: TARGET=i686-apple-darwin
+      os: osx
+
     - stage: deploy
       install: true
       script:
