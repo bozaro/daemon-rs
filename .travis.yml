@@ -1,16 +1,35 @@
 language: rust
-sudo: false
-script:
-- cargo build --verbose
-- cargo test --verbose
-- cargo doc
-after_success: |
-  [ $TRAVIS_BRANCH = master ] &&
-  [ $TRAVIS_PULL_REQUEST = false ] &&
-  echo '<meta http-equiv=refresh content=0;url=filetime/index.html>' > target/doc/index.html &&
-  pip install ghp-import --user $USER &&
-  $HOME/.local/bin/ghp-import -n target/doc &&
-  git push -qf https://${TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git gh-pages
+sudo: required
+dist: trusty
+services: docker
+cache: cargo
+
 env:
   global:
     secure: Ndg2NLgx6LjKSVifYwoPOeWGkoa4+cnD0UQfCL3+IV5dLgehrQ00sdME8y1fP5E30UqPXDMNwIq65ds6l9q8LMp7/DvSNZ+UJNZBTvT8/TR91aAk+NKVrJ35t9mOVyf0OugSW1eigTq3NGx2w/PuQzJRwV30WPWOKQgMjXtC1xk=
+  matrix:
+    - TARGET=x86_64-unknown-linux-gnu
+    - TARGET=i686-unknown-linux-gnu
+    - TARGET=x86_64-pc-windows-gnu
+    - TARGET=i686-pc-windows-gnu
+
+install:
+  - cargo install -f cross
+
+script:
+  - cross build --target $TARGET --verbose
+  - cross test --target $TARGET --verbose
+
+jobs:
+  include:
+    - stage: deploy
+      install: true
+      script:
+        - cargo doc
+      after_success: |
+          [ $TRAVIS_BRANCH = master ] &&
+          [ $TRAVIS_PULL_REQUEST = false ] &&
+          echo '<meta http-equiv=refresh content=0;url=filetime/index.html>' > target/doc/index.html &&
+          pip install ghp-import --user $USER &&
+          $HOME/.local/bin/ghp-import -n target/doc &&
+          git push -qf https://${TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git gh-pages
