@@ -1,16 +1,31 @@
 language: rust
-sudo: false
-script:
-- cargo build --verbose
-- cargo test --verbose
-- cargo doc
-after_success: |
-  [ $TRAVIS_BRANCH = master ] &&
-  [ $TRAVIS_PULL_REQUEST = false ] &&
-  echo '<meta http-equiv=refresh content=0;url=filetime/index.html>' > target/doc/index.html &&
-  pip install ghp-import --user $USER &&
-  $HOME/.local/bin/ghp-import -n target/doc &&
-  git push -qf https://${TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git gh-pages
+cache: cargo
+
 env:
   global:
     secure: Ndg2NLgx6LjKSVifYwoPOeWGkoa4+cnD0UQfCL3+IV5dLgehrQ00sdME8y1fP5E30UqPXDMNwIq65ds6l9q8LMp7/DvSNZ+UJNZBTvT8/TR91aAk+NKVrJ35t9mOVyf0OugSW1eigTq3NGx2w/PuQzJRwV30WPWOKQgMjXtC1xk=
+
+os:
+  - linux
+  - windows
+  - osx
+
+script:
+  - cargo build --verbose
+  - cargo test --verbose
+
+matrix:
+  include:
+    - name: gh-pages
+      os: linux
+      script:
+        - cargo doc
+        - echo '<meta http-equiv=refresh content=0;url=daemon/index.html>' > target/doc/index.html
+      deploy:
+        - provider: pages
+          skip_cleanup: true
+          local_dir: target/doc
+          github_token: ${TOKEN}
+          on:
+            branch: master
+            repo: bozaro/daemon-rs

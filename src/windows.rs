@@ -8,7 +8,7 @@ use std::sync::mpsc::Sender;
 
 use winapi::shared::minwindef::{BOOL, DWORD, FALSE, LPVOID, TRUE};
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
-use winapi::um::winnt::{SERVICE_WIN32_OWN_PROCESS, LPWSTR};
+use winapi::um::winnt::{LPWSTR, SERVICE_WIN32_OWN_PROCESS};
 use winapi::um::winsvc::*;
 
 declare_singleton!(
@@ -25,7 +25,7 @@ struct DaemonHolder {
 
 struct DaemonStatic {
     name: String,
-    holder: Box<DaemonFunc>,
+    holder: Box<dyn DaemonFunc>,
     handle: SERVICE_STATUS_HANDLE,
 }
 

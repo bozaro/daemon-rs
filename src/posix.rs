@@ -19,7 +19,7 @@ struct DaemonHolder {
 }
 
 struct DaemonStatic {
-    holder: Box<DaemonFunc>,
+    holder: Box<dyn DaemonFunc>,
 }
 
 trait DaemonFunc {
@@ -83,9 +83,9 @@ impl DaemonRunner for Daemon {
                 func: Some((func, rx)),
             }),
         };
-        try!(guard_compare_and_swap(daemon_null(), &mut daemon));
+        guard_compare_and_swap(daemon_null(), &mut daemon)?;
         let result = daemon_console(&mut daemon);
-        try!(guard_compare_and_swap(&mut daemon, daemon_null()));
+        guard_compare_and_swap(&mut daemon, daemon_null())?;
         result
     }
 }
